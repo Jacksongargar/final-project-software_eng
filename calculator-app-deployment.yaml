@@ -1,0 +1,105 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "CloudFormation Template for Deploying JavaScript Calculator App"
+
+# Define Parameters
+Parameters:
+  S3BucketName:
+    Type: String
+    Default: "calculator-app-unique-id"  # Corrected S3 Bucket Name
+    Description: "The name of the S3 bucket where the app is stored"
+  S3FileKey:
+    Type: String
+    Default: "calculator-app.zip"  # Corrected File Key
+    Description: "The name of the uploaded ZIP file in the S3 bucket"
+
+# Define Resources
+Resources:
+
+  # Lambda Function
+  CalculatorLambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: "CalculatorAppLambda"
+      Handler: "index.handler"
+      Runtime: nodejs18.x   # Corrected Runtime Version
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        S3Bucket: !Ref S3BucketName
+        S3Key: !Ref S3FileKey
+      Timeout: 10
+
+  # Lambda Execution Role
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: "CalculatorLambdaExecutionRole"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: "LambdaBasicExecution"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                  - s3:GetObject  # Corrected S3 Read Access
+                Resource: "*"
+
+  # API Gateway Definition
+  CalculatorApiGateway:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Name: "CalculatorAPI"
+      Description: "API Gateway for Calculator App"
+
+  # API Gateway Resource Definition
+  ApiResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref CalculatorApiGateway
+      ParentId: !GetAtt CalculatorApiGateway.RootResourceId
+      PathPart: "calculator"
+
+  # API Gateway Method Definition
+  ApiMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref CalculatorApiGateway
+      ResourceId: !Ref ApiResource
+      HttpMethod: "POST"
+      AuthorizationType: "NONE"
+      Integration:
+        IntegrationHttpMethod: "POST"
+        Type: "AWS_PROXY"
+        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${CalculatorLambdaFunction.Arn}/invocations"
+
+  # API Deployment
+  ApiDeployment:
+    Type: AWS::ApiGateway::Deployment
+    Properties:
+      RestApiId: !Ref CalculatorApiGateway
+      StageName: "prod"
+    DependsOn: ApiMethod  # Ensure API Method exists before deployment
+
+  # Lambda Permission for API Gateway
+  LambdaApiPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref CalculatorLambdaFunction
+      Action: "lambda:InvokeFunction"
+      Principal: "apigateway.amazonaws.com"
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${CalculatorApiGateway}/*/*/*"
+
+# Define Outputs
+Outputs:
+  ApiUrl:
+    Description: "The URL of the Calculator API"
+    Value: !Sub "https://${CalculatorApiGateway}.execute-api.${AWS::Region}.amazonaws.com/prod/calculator"
