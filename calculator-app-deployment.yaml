@@ -5,11 +5,11 @@ Description: "CloudFormation Template for Deploying JavaScript Calculator App"
 Parameters:
   S3BucketName:
     Type: String
-    Default: "calculator-app-unique-id"  # Corrected S3 Bucket Name
+    Default: "calculator-app-unique-id"  # Your S3 Bucket
     Description: "The name of the S3 bucket where the app is stored"
   S3FileKey:
     Type: String
-    Default: "calculator-app.zip"  # Corrected File Key
+    Default: "calculator-app.zip"  # Your uploaded zip file
     Description: "The name of the uploaded ZIP file in the S3 bucket"
 
 # Define Resources
@@ -21,7 +21,7 @@ Resources:
     Properties:
       FunctionName: "CalculatorAppLambda"
       Handler: "index.handler"
-      Runtime: nodejs18.x   # Corrected Runtime Version
+      Runtime: nodejs18.x
       Role: !GetAtt LambdaExecutionRole.Arn
       Code:
         S3Bucket: !Ref S3BucketName
@@ -50,7 +50,7 @@ Resources:
                   - logs:CreateLogGroup
                   - logs:CreateLogStream
                   - logs:PutLogEvents
-                  - s3:GetObject  # Corrected S3 Read Access
+                  - s3:GetObject
                 Resource: "*"
 
   # API Gateway Definition
